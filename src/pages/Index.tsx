@@ -1,71 +1,70 @@
-
 import React, { useState, useRef } from 'react';
 import { Camera, Search, Upload, Zap, ShoppingBag, Heart, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
 import CameraCapture from '@/components/CameraCapture';
 import SearchResults from '@/components/SearchResults';
 import ProductDetails from '@/components/ProductDetails';
+import { searchProductsByImage, Product } from '@/services/api';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('camera');
-  const [searchResults, setSearchResults] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isSearching, setIsSearching] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
-  const handleImageCapture = async (imageData) => {
+  const handleImageCapture = async (imageData: string) => {
     setIsSearching(true);
-    // Simulate AI processing
-    setTimeout(() => {
-      const mockResults = [
-        {
-          id: 1,
-          name: "Modern Minimalist Chair",
-          price: "$249.99",
-          store: "Walmart",
-          confidence: 95,
-          image: "https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=300&h=300&fit=crop",
-          category: "Furniture"
-        },
-        {
-          id: 2,
-          name: "Similar Accent Chair",
-          price: "$189.99",
-          store: "Target",
-          confidence: 87,
-          image: "https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=300&h=300&fit=crop",
-          category: "Furniture"
-        },
-        {
-          id: 3,
-          name: "Designer Office Chair",
-          price: "$329.99",
-          store: "Best Buy",
-          confidence: 78,
-          image: "https://images.unsplash.com/photo-1592078615290-033ee584e267?w=300&h=300&fit=crop",
-          category: "Furniture"
-        }
-      ];
-      setSearchResults(mockResults);
+    setActiveTab('results');
+    
+    try {
+      console.log('Sending image to ML model for processing...');
+      const response = await searchProductsByImage(imageData);
+      
+      console.log('Received results from API:', response);
+      setSearchResults(response.products || []);
+      
+      toast({
+        title: "Search Complete!",
+        description: `Found ${response.products?.length || 0} matching products`,
+      });
+      
+    } catch (error) {
+      console.error('Search failed:', error);
+      
+      toast({
+        title: "Search Failed",
+        description: "Unable to process image. Please try again.",
+        variant: "destructive",
+      });
+      
+      // Fallback to camera tab on error
+      setActiveTab('camera');
+      setSearchResults([]);
+    } finally {
       setIsSearching(false);
-      setActiveTab('results');
-    }, 2000);
+    }
   };
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        handleImageCapture(e.target.result);
+        const result = e.target?.result as string;
+        if (result) {
+          handleImageCapture(result);
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleProductSelect = (product) => {
+  const handleProductSelect = (product: Product) => {
     setSelectedProduct(product);
     setActiveTab('details');
   };
